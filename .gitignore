@@ -1,0 +1,26 @@
+# Secrets -- never commit these
+.env
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local mock CRM database (generated at runtime, not source)
+data/mock_crm_db.json
+
+# Evaluation results (may contain full meeting-summary text from test data)
+eval_results.json
+
+# OS files
+.DS_Store
+Thumbs.db
