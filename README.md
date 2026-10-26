@@ -254,12 +254,3 @@ Live Salesforce connection via proper OAuth (Authorization Code or JWT Bearer fl
 
 Built by Mohit Singh 🚀
 
-
-
-
-
-
-
-
-
-
