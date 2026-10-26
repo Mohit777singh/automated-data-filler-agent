@@ -24,3 +24,7 @@ eval_results.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Audio test files
+*.wav
+

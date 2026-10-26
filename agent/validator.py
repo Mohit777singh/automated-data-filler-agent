@@ -58,6 +58,27 @@ def validate_extraction(data: dict) -> list:
     if opp.get("Amount") is not None and opp.get("Amount") < 0:
         raise ValidationError(f"Opportunity.Amount cannot be negative: {opp.get('Amount')}")
 
+    # Insights is additive sales intelligence -- never blocks a CRM write.
+    # Missing/malformed Insights just means the UI won't have extra detail
+    # to show; the core Contact/Account/Opportunity write can still proceed.
+    insights = data.get("Insights")
+    if insights is not None:
+        valid_sentiments = {"Positive", "Neutral", "Negative", "Mixed", "Unknown"}
+        if insights.get("Sentiment") and insights["Sentiment"] not in valid_sentiments:
+            warnings.append(f"Insights.Sentiment has an unexpected value: {insights.get('Sentiment')!r}")
+
+        valid_intents = {"High", "Medium", "Low", "Unknown"}
+        if insights.get("BuyingIntent") and insights["BuyingIntent"] not in valid_intents:
+            warnings.append(f"Insights.BuyingIntent has an unexpected value: {insights.get('BuyingIntent')!r}")
+
+        for list_field in ("Requirements", "InterestedFeatures", "PainPoints",
+                            "Objections", "CompetitorsMentioned"):
+            val = insights.get(list_field)
+            if val is not None and not isinstance(val, list):
+                warnings.append(f"Insights.{list_field} should be a list, got: {type(val).__name__}")
+    else:
+        warnings.append("No Insights data returned -- AI Insights panel will be empty for this extraction.")
+
     return warnings
 
 

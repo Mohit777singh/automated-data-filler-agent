@@ -40,6 +40,18 @@ FLAT_FIELDS = [
     ("Opportunity", "Competitor__c"),
 ]
 
+# Fields NOT guaranteed to be literally stated in the synthetic generator's
+# text (e.g. Email is fabricated but never mentioned in the summary itself;
+# NumberOfEmployees ground truth is one specific number picked from a range
+# that's all the text actually states; StageName is assigned independent of
+# the text; Department is inferred from Title, not stated directly).
+# A correct, non-hallucinating agent should score LOW on these -- it's
+# supposed to say null when the source text doesn't contain the answer.
+# Reported separately so raw accuracy isn't misleadingly dragged down by
+# a dataset-generation artifact rather than a real extraction failure.
+NOT_RELIABLY_STATED_IN_TEXT = {("Contact", "Email"), ("Contact", "Department"),
+                                 ("Account", "NumberOfEmployees"), ("Opportunity", "StageName")}
+
 
 def normalize(v):
     if isinstance(v, str):
@@ -131,15 +143,32 @@ def main():
 
     print("\nField-by-field accuracy:")
     total_correct, total_fields = 0, 0
+    adjusted_correct, adjusted_fields = 0, 0
     for (obj, field), total in field_total.items():
         correct = field_correct[(obj, field)]
         total_correct += correct
         total_fields += total
+        flag = ""
+        if (obj, field) in NOT_RELIABLY_STATED_IN_TEXT:
+            flag = "  [not reliably stated in source text -- see note below]"
+        else:
+            adjusted_correct += correct
+            adjusted_fields += total
         pct = (correct / total * 100) if total else 0
-        print(f"  {obj}.{field:<20} {correct}/{total}  ({pct:.0f}%)")
+        print(f"  {obj}.{field:<20} {correct}/{total}  ({pct:.0f}%){flag}")
 
     overall_pct = (total_correct / total_fields * 100) if total_fields else 0
-    print(f"\nOVERALL FIELD ACCURACY: {total_correct}/{total_fields} ({overall_pct:.1f}%)")
+    adjusted_pct = (adjusted_correct / adjusted_fields * 100) if adjusted_fields else 0
+    print(f"\nRAW OVERALL ACCURACY (all fields): {total_correct}/{total_fields} ({overall_pct:.1f}%)")
+    print(f"ADJUSTED ACCURACY (fields actually stated in text): "
+          f"{adjusted_correct}/{adjusted_fields} ({adjusted_pct:.1f}%)")
+    print("\nNote: Email, Department, NumberOfEmployees (exact), and StageName are")
+    print("often not literally present in the source meeting summary text (the")
+    print("synthetic generator sets these independent of what the text states).")
+    print("A correct, non-hallucinating agent should score LOW here by returning")
+    print("null rather than guessing -- so the RAW score understates real quality.")
+    print("The ADJUSTED score reflects accuracy on fields genuinely extractable")
+    print("from the input text, which is the fairer measure of extraction quality.")
 
     print("\n=== Part 2: Null-handling on sparse (non-labeled) examples ===")
     correct_nulls, total_sparse, sparse_results = evaluate_sparse(sparse_rows)
@@ -153,6 +182,7 @@ def main():
             "field_accuracy": {f"{o}.{fld}": {"correct": field_correct[(o, fld)], "total": field_total[(o, fld)]}
                                  for o, fld in FLAT_FIELDS},
             "overall_field_accuracy_pct": overall_pct,
+            "adjusted_field_accuracy_pct": adjusted_pct,
             "null_handling_accuracy_pct": sparse_pct,
             "labeled_results": labeled_results,
             "sparse_results": sparse_results,
@@ -160,8 +190,9 @@ def main():
     print(f"\nDetailed results saved to {out_path}")
 
     print("\n=== Copy-paste summary for README / slides ===")
-    print(f"Field-level extraction accuracy: {overall_pct:.1f}% ({total_correct}/{total_fields} fields correct)")
-    print(f"Hallucination-avoidance rate:    {sparse_pct:.1f}% ({correct_nulls}/{total_sparse} sparse examples handled correctly)")
+    print(f"Field accuracy (fields stated in text): {adjusted_pct:.1f}% ({adjusted_correct}/{adjusted_fields})")
+    print(f"Field accuracy (all fields, incl. unstated): {overall_pct:.1f}% ({total_correct}/{total_fields})")
+    print(f"Hallucination-avoidance rate: {sparse_pct:.1f}% ({correct_nulls}/{total_sparse} sparse examples)")
 
 
 if __name__ == "__main__":
